@@ -3,36 +3,31 @@
  * Handles book-related endpoints
  */
 
+import db from "../db/index.js";
+import { books } from "../models/Book.Model.js";
+import { eq } from "drizzle-orm";
+
 /**
- * Get list of all books
+ * Get list of all available books
  * GET /books
  * Auth: Required
  */
 export const getBooks = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
-
-    // TODO: Implement pagination
-    // TODO: Implement search functionality
-    // TODO: Fetch books from database with available flag
+    const bookList = await db.query.books.findMany({
+      where: eq(books.available, true),
+    });
 
     res.status(200).json({
       success: true,
-      message: 'Books fetched successfully',
-      data: {
-        books: [],
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: 0,
-          pages: 0,
-        },
-      },
+      message: "Books fetched successfully",
+      data: bookList,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
@@ -44,29 +39,37 @@ export const getBooks = async (req, res) => {
  */
 export const getBookById = async (req, res) => {
   try {
-    const { bookId } = req.params;
+    const bookId = Number(req.params.bookId);
 
-    // TODO: Validate bookId
-    // TODO: Fetch book from database
-    // TODO: Include availability status and pricing
+    // Validate ID
+    if (isNaN(bookId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid book ID",
+      });
+    }
+
+    const book = await db.query.books.findFirst({
+      where: eq(books.id, bookId),
+    });
+
+    if (!book) {
+      return res.status(404).json({
+        success: false,
+        message: "Book not found",
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Book details fetched successfully',
-      data: {
-        id: bookId,
-        title: null,
-        author: null,
-        pricePerDay: null,
-        groupPricePerDay: null,
-        available: null,
-        createdAt: null,
-      },
+      message: "Book details fetched successfully",
+      data: book,
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
