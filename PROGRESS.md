@@ -69,3 +69,4 @@ Last updated: 28‑Jan‑2026
    ```bash
    # Open from Git Bash / terminal
    start PROGRESS.md
+.
