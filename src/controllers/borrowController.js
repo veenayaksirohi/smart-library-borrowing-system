@@ -1,261 +1,457 @@
-/**
- * Borrowing Controller
- * Handles borrowing and return-related endpoints
- */
+import db from "../db/index.js";
+import { borrows } from "../models/Borrow.Model.js";
+import { books } from "../models/Book.Model.js";
+import { users } from "../models/User.Model.js";
+import { and, eq, sql } from "drizzle-orm";
 
 /**
- * Validate borrow rules
  * POST /borrow/validate
- * Auth: Required
+ * Validate if a user can borrow a book
  */
 export const validateBorrow = async (req, res) => {
   try {
-    const { bookId, groupSize } = req.body;
-    const userId = req.user?.id;
+    const { bookId } = req.body;
+    const userId = req.user.id;
 
-    // TODO: Validate input
-    // TODO: Check if book exists
-    // TODO: Check if book is available
-    // TODO: Check user's balance and history
-    // TODO: Check borrow rules (max books, etc.)
+    if (!bookId) {
+      return res.status(400).json({
+        success: false,
+        message: "bookId is required",
+      });
+    }
 
-    res.status(200).json({
+    // Check if book exists
+    const book = await db.query.books.findFirst({
+      where: eq(books.id, bookId),
+    });
+
+    if (!book) {
+      return res.status(404).json({
+        success: false,
+        message: "Book not found",
+      });
+    }
+
+    // Check if book is available
+    if (!book.available) {
+      return res.status(400).json({
+        success: false,
+        message: "Book is not available",
+      });
+    }
+
+    // Check user's active borrows (max 1 book at a time)
+    const activeBorrows = await db
+      .select()
+      .from(borrows)
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, "ACTIVE")));
+
+    if (activeBorrows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User already has an active borrow",
+      });
+    }
+
+    return res.json({
       success: true,
-      message: 'Borrow validation successful',
+      message: "Borrow validation successful",
       data: {
         isValid: true,
         rules: {
-          maxBooksPerUser: null,
-          maxBorrowDays: null,
-          maxGroupSize: null,
+          maxBooksPerUser: 1,
+          maxBorrowDays: 14,
+          overduePenaltyPerDay: 10,
         },
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
 
 /**
- * Calculate cost before borrow
  * POST /borrow/calculate
- * Auth: Required
+ * Calculate total cost before borrowing
  */
 export const calculateCost = async (req, res) => {
   try {
-    const { bookId, daysToKeep, groupSize } = req.body;
+    const { bookId, daysToKeep } = req.body;
 
-    // TODO: Fetch book pricing
-    // TODO: Calculate base cost (pricePerDay or groupPricePerDay)
-    // TODO: Apply any discounts
-    // TODO: Return cost breakdown
+    if (!bookId || !daysToKeep) {
+      return res.status(400).json({
+        success: false,
+        message: "bookId and daysToKeep are required",
+      });
+    }
 
-    res.status(200).json({
+    // Validate daysToKeep
+    if (daysToKeep <= 0 || daysToKeep > 14) {
+      return res.status(400).json({
+        success: false,
+        message: "daysToKeep must be between 1 and 14",
+      });
+    }
+
+    const book = await db.query.books.findFirst({
+      where: eq(books.id, bookId),
+    });
+
+    if (!book) {
+      return res.status(404).json({
+        success: false,
+        message: "Book not found",
+      });
+    }
+
+    const dailyRate = Number(book.pricePerDay);
+    const totalCost = dailyRate * daysToKeep;
+
+    res.json({
       success: true,
-      message: 'Cost calculated successfully',
+      message: "Cost calculated successfully",
       data: {
-        basePrice: null,
-        groupPrice: null,
+        bookId,
+        dailyRate,
         daysToKeep,
-        groupSize,
-        totalCost: null,
+        totalCost,
         costBreakdown: {
-          dailyRate: null,
+          dailyRate,
           numberOfDays: daysToKeep,
-          subtotal: null,
-          tax: null,
-          total: null,
+          subtotal: totalCost,
+          tax: 0,
+          total: totalCost,
         },
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
 
 /**
- * Borrow a book
  * POST /borrow
- * Auth: Required
+ * Borrow a book
  */
 export const borrowBook = async (req, res) => {
   try {
-    const { bookId, daysToKeep, groupSize } = req.body;
-    const userId = req.user?.id;
+    const { bookId, daysToKeep } = req.body;
+    const userId = req.user.id;
 
-    // TODO: Validate input
-    // TODO: Check user balance
-    // TODO: Calculate cost
-    // TODO: Create borrow record in database
-    // TODO: Update book availability
-    // TODO: Deduct cost from user balance or create payment
+    // Validate input
+    if (!bookId || !daysToKeep) {
+      return res.status(400).json({
+        success: false,
+        message: "bookId and daysToKeep are required",
+      });
+    }
+
+    if (daysToKeep <= 0 || daysToKeep > 14) {
+      return res.status(400).json({
+        success: false,
+        message: "daysToKeep must be between 1 and 14",
+      });
+    }
+
+    // Check if book exists and is available
+    const book = await db.query.books.findFirst({
+      where: eq(books.id, bookId),
+    });
+
+    if (!book || !book.available) {
+      return res.status(400).json({
+        success: false,
+        message: "Book is not available",
+      });
+    }
+
+    // Check user's active borrows
+    const activeBorrows = await db
+      .select()
+      .from(borrows)
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, "ACTIVE")));
+
+    if (activeBorrows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User already has an active borrow. Return it first.",
+      });
+    }
+
+    // Calculate dates and cost
+    const borrowDate = new Date();
+    const dueDate = new Date();
+    dueDate.setDate(borrowDate.getDate() + daysToKeep);
+
+    const totalCost = Number(book.pricePerDay) * daysToKeep;
+
+    // Use transaction to ensure data consistency
+    const result = await db.transaction(async (tx) => {
+      const [newBorrow] = await tx
+        .insert(borrows)
+        .values({
+          bookId,
+          userId,
+          borrowDate,
+          dueDate,
+          totalCost,
+          status: "ACTIVE",
+        })
+        .returning();
+
+      await tx
+        .update(books)
+        .set({ available: false })
+        .where(eq(books.id, bookId));
+
+      return newBorrow;
+    });
 
     res.status(201).json({
       success: true,
-      message: 'Book borrowed successfully',
+      message: "Book borrowed successfully",
       data: {
-        borrowId: null,
-        userId,
+        borrowId: result.id,
         bookId,
-        borrowDate: null,
-        dueDate: null,
-        totalCost: null,
-        status: 'Active',
+        userId,
+        borrowDate,
+        dueDate,
+        totalCost,
+        status: "ACTIVE",
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
 
 /**
- * Get active borrows for user
  * GET /borrows/active
- * Auth: Required
+ * Get active borrow for user
  */
 export const getActiveBorrows = async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user.id;
 
-    // TODO: Fetch all active borrows for the user
-    // TODO: Include book details and due dates
-    // TODO: Calculate days remaining
+    const activeBorrows = await db
+      .select()
+      .from(borrows)
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, "ACTIVE")));
 
-    res.status(200).json({
+    res.json({
       success: true,
-      message: 'Active borrows fetched successfully',
+      message: "Active borrows fetched successfully",
       data: {
-        activeBorrows: [],
-        totalActive: 0,
+        activeBorrows,
+        totalActive: activeBorrows.length,
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
 
 /**
- * Get borrow summary
  * GET /borrows/:borrowId/summary
- * Auth: Required
+ * Get borrow summary with book details
  */
 export const getBorrowSummary = async (req, res) => {
   try {
     const { borrowId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user.id;
 
-    // TODO: Validate borrowId belongs to user
-    // TODO: Fetch borrow details
-    // TODO: Calculate overdue days and charges if applicable
-    // TODO: Include book details
+    const borrow = await db.query.borrows.findFirst({
+      where: and(eq(borrows.id, borrowId), eq(borrows.userId, userId)),
+    });
 
-    res.status(200).json({
+    if (!borrow) {
+      return res.status(404).json({
+        success: false,
+        message: "Borrow not found",
+      });
+    }
+
+    // Get book details
+    const book = await db.query.books.findFirst({
+      where: eq(books.id, borrow.bookId),
+    });
+
+    // Calculate overdue days if applicable
+    const today = new Date();
+    let daysOverdue = 0;
+    let overdueCharges = 0;
+
+    if (borrow.status === "ACTIVE" && today > borrow.dueDate) {
+      daysOverdue = Math.ceil((today - borrow.dueDate) / (1000 * 60 * 60 * 24));
+      overdueCharges = daysOverdue * 10; // ₹10 per day
+    }
+
+    res.json({
       success: true,
-      message: 'Borrow summary fetched successfully',
+      message: "Borrow summary fetched successfully",
       data: {
-        borrowId,
+        borrowId: borrow.id,
         bookDetails: {
-          id: null,
-          title: null,
-          author: null,
+          id: book.id,
+          title: book.title,
+          author: book.author,
         },
-        borrowDate: null,
-        dueDate: null,
-        returnDate: null,
-        status: null,
-        totalCost: null,
-        overdueCharges: null,
-        daysOverdue: 0,
+        borrowDate: borrow.borrowDate,
+        dueDate: borrow.dueDate,
+        returnDate: borrow.returnDate,
+        status: borrow.status,
+        totalCost: borrow.totalCost,
+        overdueCharges: borrow.overdue || overdueCharges,
+        daysOverdue,
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
 
 /**
- * Return a book
  * POST /borrows/:borrowId/submit
- * Auth: Required
+ * Return a book and calculate overdue charges
  */
 export const submitReturn = async (req, res) => {
   try {
     const { borrowId } = req.params;
-    const userId = req.user?.id;
+    const userId = req.user.id;
 
-    // TODO: Validate borrowId belongs to user
-    // TODO: Check if borrow is active
-    // TODO: Calculate overdue charges if applicable
-    // TODO: Update borrow status to returned
-    // TODO: Update book availability
-    // TODO: Create payment record if overdue
+    // Verify borrow exists and belongs to user
+    const borrow = await db.query.borrows.findFirst({
+      where: and(eq(borrows.id, borrowId), eq(borrows.userId, userId)),
+    });
 
-    res.status(200).json({
+    if (!borrow) {
+      return res.status(404).json({
+        success: false,
+        message: "Borrow not found",
+      });
+    }
+
+    if (borrow.status !== "ACTIVE") {
+      return res.status(400).json({
+        success: false,
+        message: "Borrow is not active",
+      });
+    }
+
+    // Calculate overdue charges
+    const returnDate = new Date();
+    let overdueCharge = 0;
+
+    if (returnDate > borrow.dueDate) {
+      const daysLate = Math.ceil((returnDate - borrow.dueDate) / (1000 * 60 * 60 * 24));
+      overdueCharge = daysLate * 10; // ₹10 per day
+    }
+
+    // Use transaction to update both borrow and book status
+    await db.transaction(async (tx) => {
+      await tx
+        .update(borrows)
+        .set({
+          returnDate,
+          overdue: overdueCharge,
+          status: "RETURNED",
+        })
+        .where(eq(borrows.id, borrowId));
+
+      await tx
+        .update(books)
+        .set({ available: true })
+        .where(eq(books.id, borrow.bookId));
+    });
+
+    const finalAmount = Number(borrow.totalCost) + overdueCharge;
+
+    res.json({
       success: true,
-      message: 'Book returned successfully',
+      message: "Book returned successfully",
       data: {
         borrowId,
-        returnDate: null,
-        status: 'Returned',
-        totalCost: null,
-        overdueCharges: null,
-        finalAmount: null,
+        returnDate,
+        status: "RETURNED",
+        borrowCost: borrow.totalCost,
+        overdueCharges: overdueCharge,
+        finalAmount,
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };
 
 /**
- * Get borrow history
  * GET /borrows/history
- * Auth: Required
+ * Get borrow history for user
  */
 export const getBorrowHistory = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const { page = 1, limit = 10 } = req.query;
+    const userId = req.user.id;
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
 
-    // TODO: Implement pagination
-    // TODO: Fetch all borrows (completed and active) for user
-    // TODO: Include book details and return information
+    const offset = (page - 1) * limit;
 
-    res.status(200).json({
+    // Fetch history
+    const history = await db
+      .select()
+      .from(borrows)
+      .where(eq(borrows.userId, userId))
+      .limit(limit)
+      .offset(offset)
+      .orderBy(borrows.createdAt);
+
+    // Get total count
+    const [{ count }] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(borrows)
+      .where(eq(borrows.userId, userId));
+
+    res.json({
       success: true,
-      message: 'Borrow history fetched successfully',
+      message: "Borrow history fetched successfully",
       data: {
-        borrows: [],
+        borrows: history,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: 0,
-          pages: 0,
+          page,
+          limit,
+          total: count,
+          pages: Math.ceil(count / limit),
         },
       },
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Server error",
     });
   }
 };

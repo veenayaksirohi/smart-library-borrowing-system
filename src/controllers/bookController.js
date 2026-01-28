@@ -1,27 +1,52 @@
-/**
- * Books Controller
- * Handles book-related endpoints
- */
-
 import db from "../db/index.js";
 import { books } from "../models/Book.Model.js";
-import { eq } from "drizzle-orm";
+import { and, eq, ilike, sql } from "drizzle-orm";
 
 /**
- * Get list of all available books
  * GET /books
- * Auth: Required
+ * Get all books with pagination and search
  */
 export const getBooks = async (req, res) => {
   try {
-    const bookList = await db.query.books.findMany({
-      where: eq(books.available, true),
-    });
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    const search = req.query.search || "";
 
-    res.status(200).json({
+    const offset = (page - 1) * limit;
+
+    // Build where clause
+    const whereConditions = [];
+    if (search) {
+      whereConditions.push(ilike(books.title, `%${search}%`));
+    }
+
+    const whereClause =
+      whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    // Fetch books
+    const bookList = await db
+      .select()
+      .from(books)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset);
+
+    // Get total count
+    const [{ count }] = await db
+      .select({ count: sql`count(*)::int` })
+      .from(books)
+      .where(whereClause);
+
+    res.json({
       success: true,
       message: "Books fetched successfully",
       data: bookList,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        pages: Math.ceil(count / limit),
+      },
     });
   } catch (error) {
     console.error(error);
@@ -33,24 +58,23 @@ export const getBooks = async (req, res) => {
 };
 
 /**
- * Get book details by ID
  * GET /books/:bookId
- * Auth: Required
+ * Get single book by ID
  */
 export const getBookById = async (req, res) => {
   try {
-    const bookId = Number(req.params.bookId);
+    const { bookId } = req.params;
 
-    // Validate ID
-    if (isNaN(bookId)) {
+    // Validate bookId
+    if (!bookId || isNaN(parseInt(bookId))) {
       return res.status(400).json({
         success: false,
-        message: "Invalid book ID",
+        message: "Invalid bookId",
       });
     }
 
     const book = await db.query.books.findFirst({
-      where: eq(books.id, bookId),
+      where: eq(books.id, parseInt(bookId)),
     });
 
     if (!book) {
@@ -60,7 +84,7 @@ export const getBookById = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: "Book details fetched successfully",
       data: book,

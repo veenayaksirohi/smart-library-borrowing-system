@@ -1,6 +1,6 @@
 # 📊 Project Progress Tracker - Smart Library Borrowing System
 
-Last updated: 28‑Jan‑2026
+Last updated: 28‑Jan‑2026 (Final)
 
 ---
 
@@ -10,7 +10,7 @@ Last updated: 28‑Jan‑2026
 |--------------------|--------|
 | PRD & Planning     | ✅ Done |
 | Tech Stack (Node + PostgreSQL) | ✅ Done |
-| Backend (APIs)     | ⏳ In Progress |
+| Backend (APIs)     | ✅ Done |
 | Frontend (HTML/CSS/JS) | 🔲 Not Started |
 | Integration & Testing | 🔲 Not Started |
 | Deployment & Final Touches | 🔲 Not Started |
@@ -22,17 +22,17 @@ Last updated: 28‑Jan‑2026
 | Task ID | Phase | Feature | Status | Priority | Done Date |
 |--------|-------|--------|--------|----------|-----------|
 | T1 | Planning & Setup | Finalize PRD (Smart Library Borrowing System) | ✅ Done | High | 28‑Jan‑2026 |
-| T2 | Planning & Setup | Set up Node.js project (npm init, .gitignore, etc.) | ⏳ In Progress | Medium | |
-| T3 | Planning & Setup | Initialize PostgreSQL DB and tables (users, books, borrows, payments) | 🔲 Not Started | Medium | |
-| T4 | Planning & Setup | Set up basic Express server (server.js, routes, controllers) | 🔲 Not Started | Medium | |
-| T5 | Planning & Setup | Install and configure authentication (bcrypt, JWT) | 🔲 Not Started | Medium | |
-| T1 | Core Backend (APIs) | `/auth/signup`, `/auth/login`, `/auth/profile` APIs | 🔲 Not Started | High | |
-| T2 | Core Backend (APIs) | `/books` (GET) and `/books/:bookId` (GET) | 🔲 Not Started | Medium | |
-| T3 | Core Backend (APIs) | `/borrow/validate`, `/borrow/calculate`, `/borrow` (POST) | 🔲 Not Started | Medium | |
-| T4 | Core Backend (APIs) | `/borrows/active`, `/borrows/:borrowId/summary` | 🔲 Not Started | Medium | |
-| T5 | Core Backend (APIs) | `/borrows/:borrowId/submit` (POST) | 🔲 Not Started | Medium | |
-| T6 | Core Backend (APIs) | `/borrows/history`, `/payments/history` | 🔲 Not Started | Medium | |
-| T7 | Core Backend (APIs) | `/dashboard/summary` API | 🔲 Not Started | Medium | |
+| T2 | Planning & Setup | Set up Node.js project (npm init, .gitignore, etc.) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T3 | Planning & Setup | Initialize PostgreSQL DB and tables (users, books, borrows, payments) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T4 | Planning & Setup | Set up basic Express server (server.js, routes, controllers) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T5 | Planning & Setup | Install and configure authentication (bcrypt, JWT) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T1 | Core Backend (APIs) | `/auth/signup`, `/auth/login`, `/auth/profile` APIs | ✅ Done | High | 28‑Jan‑2026 |
+| T2 | Core Backend (APIs) | `/books` (GET) and `/books/:bookId` (GET) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T3 | Core Backend (APIs) | `/borrow/validate`, `/borrow/calculate`, `/borrow` (POST) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T4 | Core Backend (APIs) | `/borrows/active`, `/borrows/:borrowId/summary` | ✅ Done | Medium | 28‑Jan‑2026 |
+| T5 | Core Backend (APIs) | `/borrows/:borrowId/submit` (POST) | ✅ Done | Medium | 28‑Jan‑2026 |
+| T6 | Core Backend (APIs) | `/borrows/history`, `/payments/history` | ✅ Done | Medium | 28‑Jan‑2026 |
+| T7 | Core Backend (APIs) | `/dashboard/summary` API | ✅ Done | Medium | 28‑Jan‑2026 |
 | T1 | Frontend (Static Pages) | Home / Login / Signup page (HTML/CSS/JS) | 🔲 Not Started | Medium | |
 | T2 | Frontend (Static Pages) | Dashboard view with summaries (active borrows, balance, etc.) | 🔲 Not Started | Medium | |
 | T3 | Frontend (Static Pages) | Book list view (show all books, prices, availability) | 🔲 Not Started | Medium | |

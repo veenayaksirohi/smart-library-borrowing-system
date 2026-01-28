@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { users } from "../models/User.Model.js";
 import db from "../db/index.js";
+import { eq } from "drizzle-orm";
 
 export const protect = async (req, res, next) => {
   let token;
@@ -23,11 +24,11 @@ export const protect = async (req, res, next) => {
 
   try {
     // 3. Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your_secret_key_here");
 
     // 4. Get user from DB
     const user = await db.query.users.findFirst({
-      where: (usersTable, { eq }) => eq(usersTable.id, decoded.id),
+      where: eq(users.id, decoded.id),
     });
 
     if (!user) {
