@@ -13,29 +13,44 @@ import { protect } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 /**
- * Public routes (require auth)
+ * POST /validate
+ * Validate if a user can borrow a book
  */
 router.post("/validate", protect, validateBorrow);
+
+/**
+ * POST /calculate
+ * Calculate total cost before borrowing
+ */
 router.post("/calculate", protect, calculateCost);
+
+/**
+ * POST /
+ * Borrow a book
+ */
 router.post("/", protect, borrowBook);
 
 /**
- * Get active borrows
+ * GET /active
+ * Get active borrows for user (MUST BE BEFORE /:borrowId ROUTES)
  */
 router.get("/active", protect, getActiveBorrows);
 
 /**
- * Borrow history
+ * GET /history
+ * Get borrow history for user (MUST BE BEFORE /:borrowId ROUTES)
  */
 router.get("/history", protect, getBorrowHistory);
 
 /**
- * Get borrow summary
+ * GET /:borrowId/summary
+ * Get borrow summary with book details
  */
 router.get("/:borrowId/summary", protect, getBorrowSummary);
 
 /**
- * Submit return
+ * POST /:borrowId/submit
+ * Return a book and calculate overdue charges
  */
 router.post("/:borrowId/submit", protect, submitReturn);
 

@@ -11,7 +11,7 @@ export const payments = pgTable("payments", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 20 }).default("PENDING"),
 
-  paymentDate: date("payment_date").default(new Date()),
+  date: date("date").default(new Date()),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at")

@@ -5,6 +5,59 @@ import { users } from '../models/User.Model.js';
 import { eq, sum, count, and, sql } from 'drizzle-orm';
 
 /**
+ * Mark payment as completed
+ * POST /payments/:paymentId/complete
+ * Auth: Required
+ */
+export const completePayment = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    const userId = req.user.id;
+
+    // Verify payment exists and belongs to user
+    const payment = await db.query.payments.findFirst({
+      where: and(eq(payments.id, parseInt(paymentId)), eq(payments.userId, userId)),
+    });
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    if (payment.status === "PAID") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment already completed",
+      });
+    }
+
+    // Update payment status
+    await db
+      .update(payments)
+      .set({ status: "PAID" })
+      .where(eq(payments.id, parseInt(paymentId)));
+
+    res.json({
+      success: true,
+      message: "Payment marked as completed",
+      data: {
+        paymentId: parseInt(paymentId),
+        status: "PAID",
+        amount: payment.amount,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+/**
  * Get payment history (all records, no pagination)
  * GET /payments/history
  * Auth: Required
@@ -22,7 +75,15 @@ export const getPaymentHistory = async (req, res) => {
 
     // Fetch all payments for this user
     const dbPayments = await db
-      .select()
+      .select({
+        id: payments.id,
+        userId: payments.userId,
+        amount: payments.amount,
+        status: payments.status,
+        date: payments.date,
+        createdAt: payments.createdAt,
+        updatedAt: payments.updatedAt,
+      })
       .from(payments)
       .where(eq(payments.userId, userId))
       .orderBy(payments.createdAt);
@@ -39,8 +100,8 @@ export const getPaymentHistory = async (req, res) => {
       }
 
       let paymentDate = null;
-      if (p.paymentDate) {
-        paymentDate = new Date(p.paymentDate).toISOString().split('T')[0];
+      if (p.date) {
+        paymentDate = new Date(p.date).toISOString().split('T')[0];
       }
 
       let createdAt = null;
@@ -152,7 +213,7 @@ export const getDashboardSummary = async (req, res) => {
         count: count(),
       })
       .from(borrows)
-      .where(and(eq(borrows.userId, userId), eq(borrows.status, 'ACTIVE')));
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, 'Active')));
 
     let activeBorrows = 0;
     if (activeRows.length > 0 && activeRows[0].count != null) {
@@ -290,7 +351,7 @@ export const getDashboardSummary = async (req, res) => {
         returnDate: borrows.returnDate,
       })
       .from(borrows)
-      .where(and(eq(borrows.userId, userId), eq(borrows.status, 'RETURNED')));
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, 'Returned')));
 
     let totalBorrowDays = 0;
     let returnedCount = 0;

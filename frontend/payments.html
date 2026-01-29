@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payments - Smart Library</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">📚 Smart Library</a>
+    <div class="navbar-menu">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="books.html">Browse Books</a>
+      <a href="my-borrows.html">My Borrows</a>
+      <a href="payments.html">Payments</a>
+      <span id="userName"></span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div id="message" class="message"></div>
+
+    <h1 style="margin-bottom: 30px; color: white;">💳 Payment History</h1>
+
+    <!-- Payment Summary -->
+    <div class="dashboard-grid" style="margin-bottom: 30px;">
+      <div class="stat-card">
+        <div class="stat-label">Total Payments</div>
+        <div class="stat-value" id="totalPayments">₹-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Amount</div>
+        <div class="stat-value" id="pendingAmount">₹-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value" id="completedPayments">₹-</div>
+      </div>
+    </div>
+
+    <!-- Payment History Table -->
+    <div class="card">
+      <h2 class="card-title">Payment Records</h2>
+      <div id="paymentsContainer" class="loading">
+        <span class="spinner"></span> Loading...
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Check authentication
+    redirectIfNotAuth();
+
+    // Display user name
+    const userName = localStorage.getItem('userName');
+    if (userName) {
+      document.getElementById('userName').textContent = `Welcome, ${userName}`;
+    }
+
+    // Load payment history
+    async function loadPayments() {
+      try {
+        const response = await api.getPaymentHistory();
+        
+        if (response.success) {
+          const payments = response.data.payments || [];
+
+          if (payments.length === 0) {
+            document.getElementById('paymentsContainer').innerHTML = 
+              '<p style="text-align: center; padding: 30px; color: #666;">No payments yet. <a href="books.html" style="color: #667eea;">Borrow a book</a></p>';
+          } else {
+            // Create table
+            let html = `
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Payment ID</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+
+            let totalAmount = 0;
+            let pendingAmount = 0;
+            let completedAmount = 0;
+
+            payments.forEach(payment => {
+              const amount = parseFloat(payment.amount) || 0;
+              totalAmount += amount;
+              
+              const date = new Date(payment.date).toLocaleDateString();
+              const statusClass = payment.status === 'PENDING' ? 'warning' : 'success';
+              const statusText = payment.status === 'PENDING' ? '⏳ Pending' : '✓ Completed';
+
+              if (payment.status === 'PENDING') {
+                pendingAmount += amount;
+              } else {
+                completedAmount += amount;
+              }
+
+              const actionButton = payment.status === 'PENDING' 
+                ? `<button class="btn btn-success btn-small" onclick="markAsPaid(${payment.id})" style="font-size: 12px; padding: 4px 8px;">Mark as Paid</button>`
+                : '-';
+
+              html += `
+                <tr>
+                  <td>#${payment.id}</td>
+                  <td>₹${payment.amount}</td>
+                  <td><span class="message ${statusClass}" style="display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 12px;">${statusText}</span></td>
+                  <td>${date}</td>
+                  <td>${actionButton}</td>
+                </tr>
+              `;
+            });
+
+            html += `
+                </tbody>
+              </table>
+            `;
+            document.getElementById('paymentsContainer').innerHTML = html;
+
+            // Update summary
+            document.getElementById('totalPayments').textContent = `₹${totalAmount.toFixed(2)}`;
+            document.getElementById('pendingAmount').textContent = `₹${pendingAmount.toFixed(2)}`;
+            document.getElementById('completedPayments').textContent = `₹${completedAmount.toFixed(2)}`;
+          }
+        } else {
+          showMessage(response.message || 'Failed to load payments', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Mark payment as paid
+    async function markAsPaid(paymentId) {
+      if (!confirm('Mark this payment as completed?')) {
+        return;
+      }
+
+      try {
+        const response = await api.completePayment(paymentId);
+        if (response.success) {
+          showMessage('Payment marked as completed!', 'success');
+          loadPayments(); // Refresh the list
+        } else {
+          showMessage(response.message || 'Failed to complete payment', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Load on page load
+    loadPayments();
+    setInterval(loadPayments, 30000); // Refresh every 30 seconds
+  </script>
+</body>
+</html>

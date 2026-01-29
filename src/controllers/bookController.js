@@ -20,8 +20,11 @@ export const getBooks = async (req, res) => {
       whereConditions.push(ilike(books.title, `%${search}%`));
     }
 
+    // Only show available books
+    whereConditions.push(eq(books.available, true));
+
     const whereClause =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
+      whereConditions.length > 0 ? and(...whereConditions) : eq(books.available, true);
 
     // Fetch books
     const bookList = await db
@@ -40,7 +43,12 @@ export const getBooks = async (req, res) => {
     res.json({
       success: true,
       message: "Books fetched successfully",
-      data: bookList,
+      data: {
+        books: bookList,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page,
+        totalBooks: count,
+      },
       pagination: {
         page,
         limit,

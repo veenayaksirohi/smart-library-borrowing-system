@@ -9,42 +9,70 @@ The Smart Library Borrowing System automates borrowing validation, cost calculat
 ## Key Features
 
 - **Student Authentication**: Secure signup and login with JWT-based authentication
-- **Book Management**: Browse a predefined collection of 20 books
+- **Book Management**: Browse a predefined collection of 20 books with search and pagination
 - **Borrowing Flow**: Borrow books with automatic validation and cost calculation
 - **Return Management**: Return books with automatic overdue charge calculation
 - **Dashboard**: Real-time summary of active borrows, balances, and borrowing history
-- **Payment History**: Track simulated payment records
+- **Payment System**: Track payment records with automatic and manual completion
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
+- **Real-time Updates**: Dashboard and payment status update automatically
 
 ## Tech Stack
 
 | Component        | Technology                                        |
 | --------------- | ------------------------------------------------- |
 | Backend         | Node.js with Express.js                          |
-| Database        | MongoDB (via Mongoose)                           |
+| Database        | PostgreSQL 16 (via Drizzle ORM)                 |
 | Authentication  | JWT (JSON Web Tokens)                            |
 | Password Security| Bcrypt                                            |
-| Validation      | Zod                                              |
-| Rate Limiting   | express-rate-limit                               |
-| API Docs        | Swagger/OpenAPI                                  |
-| Email (Future)  | Nodemailer + Mailgen                             |
-| File Upload     | Multer                                           |
+| Frontend        | Vanilla HTML/CSS/JavaScript                      |
+| HTTP Client     | Fetch API                                        |
+| Development     | Node.js, npm                                     |
 
 ## Project Structure
 
 ```
-ExpressJS_StarterPack/
+smart-library-borrowing-system/
 ├── server.js                 # Application entry point
 ├── src/
 │   ├── app.js               # Express app configuration
-│   ├── configs/             # Configuration files
 │   ├── controllers/         # Route controllers
+│   │   ├── authController.js
+│   │   ├── bookController.js
+│   │   ├── borrowController.js
+│   │   └── paymentController.js
 │   ├── middleware/          # Custom middleware
-│   ├── models/              # Database models
+│   │   └── authMiddleware.js
+│   ├── models/              # Database models (Drizzle ORM)
+│   │   ├── User.Model.js
+│   │   ├── Book.Model.js
+│   │   ├── Borrow.Model.js
+│   │   └── Payment.Model.js
 │   ├── routes/              # API routes
+│   │   ├── authRoutes.js
+│   │   ├── bookRoutes.js
+│   │   ├── borrowRoutes.js
+│   │   └── paymentRoutes.js
+│   ├── db/                  # Database connection
+│   │   └── index.js
 │   └── utils/               # Utility functions
+│       └── generateToken.js
+├── frontend/                # Frontend application
+│   ├── index.html           # Home page
+│   ├── login.html           # Login page
+│   ├── signup.html          # Signup page
+│   ├── dashboard.html       # Dashboard
+│   ├── books.html           # Browse books
+│   ├── my-borrows.html      # Borrow history
+│   ├── payments.html        # Payment history
+│   ├── css/
+│   │   └── style.css        # All styling
+│   └── js/
+│       └── api.js           # API client
+├── drizzle/                 # Database migrations
+│   └── 0000_harsh_darkhawk.sql
 ├── package.json             # Dependencies and scripts
-├── .eslintrc                # ESLint configuration
-├── .prettierrc               # Prettier configuration
+├── .env                     # Environment variables
 └── README.md                # This file
 ```
 
@@ -54,42 +82,92 @@ ExpressJS_StarterPack/
 
 - Node.js (v18+)
 - npm or yarn
-- MongoDB
+- PostgreSQL 16+
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
-git clone https://github.com/veenayaksirohi/Project_Camp_Backend.git
-cd Project_Camp_Backend
+git clone https://github.com/veenayaksirohi/smart-library-borrowing-system.git
+cd smart-library-borrowing-system
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 ```bash
 npm install
 ```
 
-3. Create a `.env` file in the root directory:
-```env
-PORT=5000
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret_key
-NODE_ENV=development
-```
-
-4. Start the development server:
+3. **Set up PostgreSQL database:**
 ```bash
-npm run dev
+# Create database
+createdb smart_library
+
+# Or using psql
+psql -U postgres
+CREATE DATABASE smart_library;
+\q
 ```
 
-The server will start on `http://localhost:5000`
+4. **Create a `.env` file in the root directory:**
+```env
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/smart_library
+NODE_ENV=development
+PORT=5000
+JWT_SECRET=your_jwt_secret_key_here
+```
+
+5. **Run database migrations:**
+```bash
+# The migration will create all necessary tables
+psql -U postgres -d smart_library -f drizzle/0000_harsh_darkhawk.sql
+```
+
+6. **Start the backend server:**
+```bash
+node server.js
+```
+
+The backend server will start on `http://localhost:5000`
+
+7. **Start the frontend (in a new terminal):**
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Start a simple HTTP server (Python 3)
+python -m http.server 8000
+
+# Or using Node.js (if you have http-server installed)
+npx http-server -p 8000
+
+# Or using PHP
+php -S localhost:8000
+```
+
+The frontend will be available at `http://localhost:8000`
+
+### Quick Test
+
+1. Open `http://localhost:8000` in your browser
+2. Click "Sign Up" to create a new account
+3. Login with your credentials
+4. Browse books and test the borrowing functionality
 
 ## Available Scripts
 
-- `npm run dev` - Start the development server with auto-reload
-- `npm run lint` - Run ESLint to check code quality
-- `npm run lint:fix` - Fix ESLint issues automatically
-- `npm run format` - Format code with Prettier
+- `node server.js` - Start the backend server
+- `npm test` - Run API tests (if available)
+
+## Frontend Development
+
+The frontend is built with vanilla HTML, CSS, and JavaScript for simplicity and performance.
+
+### Frontend Features
+- **Responsive Design**: Works on desktop, tablet, and mobile
+- **Real-time Updates**: Dashboard and payment status update automatically
+- **Error Handling**: User-friendly error messages and validation
+- **Authentication**: Secure login/logout with JWT tokens
+- **Modern UI**: Clean, professional interface with smooth animations
 
 ## API Endpoints
 
@@ -112,38 +190,53 @@ The server will start on `http://localhost:5000`
 - `GET /borrows/:borrowId/summary` - Get borrow summary
 - `POST /borrows/:borrowId/submit` - Return a book
 
-### History & Dashboard
+### History
 - `GET /borrows/history` - Get borrow history
+
+### Payments
 - `GET /payments/history` - Get payment history
-- `GET /dashboard/summary` - Get dashboard summary
+- `POST /payments/:paymentId/complete` - Mark payment as completed
+- `GET /payments/dashboard/summary` - Get dashboard summary
 
 ## Data Model
 
-### Users
-- Store student information, balance, and authentication credentials
-- Password hashing with Bcrypt
+### Users Table
+- id (Primary Key)
+- name, email, password (hashed with Bcrypt)
+- balance (decimal)
+- created_at, updated_at
 
-### Books
-- Predefined collection of 20 books with pricing information
-- Track availability status
+### Books Table
+- id (Primary Key)
+- title, author
+- price_per_day, group_price_per_day (decimal)
+- available (boolean)
+- created_at, updated_at
 
-### Borrows
-- Track all borrowing transactions
-- Calculate costs and overdue charges automatically
-- Support active and returned statuses
+### Borrows Table
+- id (Primary Key)
+- book_id (Foreign Key → books.id)
+- user_id (Foreign Key → users.id)
+- borrow_date, due_date, return_date
+- total_cost, overdue (decimal)
+- status ('Active' or 'Returned')
+- created_at, updated_at
 
-### Payments
-- Track simulated payment records
-- Support pending and paid statuses
+### Payments Table
+- id (Primary Key)
+- user_id (Foreign Key → users.id)
+- amount (decimal)
+- status ('PENDING' or 'PAID')
+- date, created_at, updated_at
 
 ## Validation & Security
 
-- Input validation with Zod
+- Input validation on all API endpoints
 - Password hashing with Bcrypt
 - JWT authentication for protected routes
-- CORS enabled for security
-- Rate limiting to prevent abuse
-- Cookie parser for secure session handling
+- CORS enabled for cross-origin requests
+- Proper error handling with HTTP status codes
+- SQL injection prevention via Drizzle ORM
 
 ## Error Handling
 
@@ -161,17 +254,39 @@ The application includes comprehensive error handling with:
 - Analytics and reporting features
 - Real-time notifications
 
-## Development Guidelines
+## Testing
 
-### Code Quality
-- ESLint is configured for code consistency
-- Prettier is configured for code formatting
-- Pre-commit hooks via Husky and lint-staged
+The project includes comprehensive API testing:
 
-### Contributing
-- Follow the existing code structure
-- Run `npm run lint:fix` before committing
-- Ensure all tests pass
+```bash
+# Run API tests (if available)
+./api-tests.sh
+
+# Seed test data
+./seed-test-data.sh
+```
+
+## Deployment
+
+### Backend Deployment Options
+- **Railway**: Connect GitHub repo and deploy
+- **Render**: Free tier available
+- **Heroku**: Classic PaaS option
+- **DigitalOcean App Platform**: Simple deployment
+
+### Frontend Deployment Options
+- **Netlify**: Drag and drop the `frontend/` folder
+- **Vercel**: Connect GitHub repo
+- **GitHub Pages**: Push `frontend/` to gh-pages branch
+- **Any static hosting**: Upload `frontend/` folder contents
+
+### Environment Variables for Production
+```env
+DATABASE_URL=your_production_postgresql_url
+NODE_ENV=production
+PORT=5000
+JWT_SECRET=your_secure_jwt_secret
+```
 
 ## License
 
@@ -183,4 +298,4 @@ Veena Yaksirohi
 
 ## Repository
 
-[GitHub - Project_Camp_Backend](https://github.com/veenayaksirohi/Project_Camp_Backend)
+[GitHub - Smart Library Borrowing System](https://github.com/veenayaksirohi/smart-library-borrowing-system)

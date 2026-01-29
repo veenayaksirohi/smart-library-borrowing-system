@@ -2,6 +2,7 @@ import db from "../db/index.js";
 import { borrows } from "../models/Borrow.Model.js";
 import { books } from "../models/Book.Model.js";
 import { users } from "../models/User.Model.js";
+import { payments } from "../models/Payment.Model.js";
 import { and, eq, sql } from "drizzle-orm";
 
 /**
@@ -44,7 +45,7 @@ export const validateBorrow = async (req, res) => {
     const activeBorrows = await db
       .select()
       .from(borrows)
-      .where(and(eq(borrows.userId, userId), eq(borrows.status, "ACTIVE")));
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, "Active")));
 
     if (activeBorrows.length > 0) {
       return res.status(400).json({
@@ -146,8 +147,11 @@ export const borrowBook = async (req, res) => {
     const { bookId, daysToKeep } = req.body;
     const userId = req.user.id;
 
+    console.log('Borrow request received:', { bookId, daysToKeep, userId, body: req.body });
+
     // Validate input
     if (!bookId || !daysToKeep) {
+      console.log('Validation failed: missing bookId or daysToKeep');
       return res.status(400).json({
         success: false,
         message: "bookId and daysToKeep are required",
@@ -177,7 +181,7 @@ export const borrowBook = async (req, res) => {
     const activeBorrows = await db
       .select()
       .from(borrows)
-      .where(and(eq(borrows.userId, userId), eq(borrows.status, "ACTIVE")));
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, "Active")));
 
     if (activeBorrows.length > 0) {
       return res.status(400).json({
@@ -203,9 +207,17 @@ export const borrowBook = async (req, res) => {
           borrowDate,
           dueDate,
           totalCost,
-          status: "ACTIVE",
+          status: "Active",
         })
         .returning();
+
+      // Create corresponding payment record
+      await tx.insert(payments).values({
+        userId,
+        amount: totalCost,
+        status: "PENDING",
+        date: borrowDate,
+      });
 
       await tx
         .update(books)
@@ -225,7 +237,7 @@ export const borrowBook = async (req, res) => {
         borrowDate,
         dueDate,
         totalCost,
-        status: "ACTIVE",
+        status: "Active",
       },
     });
   } catch (error) {
@@ -245,10 +257,26 @@ export const getActiveBorrows = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Get active borrows with book details
     const activeBorrows = await db
-      .select()
+      .select({
+        id: borrows.id,
+        bookId: borrows.bookId,
+        userId: borrows.userId,
+        borrowDate: borrows.borrowDate,
+        dueDate: borrows.dueDate,
+        returnDate: borrows.returnDate,
+        totalCost: borrows.totalCost,
+        overdue: borrows.overdue,
+        status: borrows.status,
+        createdAt: borrows.createdAt,
+        updatedAt: borrows.updatedAt,
+        bookTitle: books.title,
+        bookAuthor: books.author,
+      })
       .from(borrows)
-      .where(and(eq(borrows.userId, userId), eq(borrows.status, "ACTIVE")));
+      .leftJoin(books, eq(borrows.bookId, books.id))
+      .where(and(eq(borrows.userId, userId), eq(borrows.status, "Active")));
 
     res.json({
       success: true,
@@ -297,7 +325,7 @@ export const getBorrowSummary = async (req, res) => {
     let daysOverdue = 0;
     let overdueCharges = 0;
 
-    if (borrow.status === "ACTIVE" && today > borrow.dueDate) {
+    if (borrow.status === "Active" && today > borrow.dueDate) {
       daysOverdue = Math.ceil((today - borrow.dueDate) / (1000 * 60 * 60 * 24));
       overdueCharges = daysOverdue * 10; // ₹10 per day
     }
@@ -351,7 +379,7 @@ export const submitReturn = async (req, res) => {
       });
     }
 
-    if (borrow.status !== "ACTIVE") {
+    if (borrow.status !== "Active") {
       return res.status(400).json({
         success: false,
         message: "Borrow is not active",
@@ -367,14 +395,14 @@ export const submitReturn = async (req, res) => {
       overdueCharge = daysLate * 10; // ₹10 per day
     }
 
-    // Use transaction to update both borrow and book status
+    // Use transaction to update both borrow and book status, and mark payment as completed
     await db.transaction(async (tx) => {
       await tx
         .update(borrows)
         .set({
           returnDate,
           overdue: overdueCharge,
-          status: "RETURNED",
+          status: "Returned",
         })
         .where(eq(borrows.id, borrowId));
 
@@ -382,6 +410,15 @@ export const submitReturn = async (req, res) => {
         .update(books)
         .set({ available: true })
         .where(eq(books.id, borrow.bookId));
+
+      // Mark the corresponding payment as completed
+      await tx
+        .update(payments)
+        .set({ status: "PAID" })
+        .where(and(
+          eq(payments.userId, userId),
+          eq(payments.amount, borrow.totalCost)
+        ));
     });
 
     const finalAmount = Number(borrow.totalCost) + overdueCharge;
@@ -392,7 +429,7 @@ export const submitReturn = async (req, res) => {
       data: {
         borrowId,
         returnDate,
-        status: "RETURNED",
+        status: "Returned",
         borrowCost: borrow.totalCost,
         overdueCharges: overdueCharge,
         finalAmount,

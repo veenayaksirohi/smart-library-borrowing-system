@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Smart Library</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">📚 Smart Library</a>
+    <div class="navbar-menu">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="books.html">Browse Books</a>
+      <a href="my-borrows.html">My Borrows</a>
+      <a href="payments.html">Payments</a>
+      <span id="userName"></span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div id="message" class="message"></div>
+
+    <h1 style="margin-bottom: 30px; color: white;">Welcome to Smart Library! 📚</h1>
+
+    <!-- Dashboard Stats -->
+    <div class="dashboard-grid" id="statsContainer">
+      <div class="stat-card">
+        <div class="stat-label">Active Borrows</div>
+        <div class="stat-value" id="activeBorrowsCount">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Payments</div>
+        <div class="stat-value" id="pendingPaymentAmount">₹-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Books Borrowed</div>
+        <div class="stat-value" id="totalBorrowsCount">-</div>
+      </div>
+    </div>
+
+    <!-- Active Borrows Section -->
+    <div class="card">
+      <h2 class="card-title">📖 Active Borrows</h2>
+      <div id="activeBorrowsContainer" class="loading">
+        <span class="spinner"></span> Loading...
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+      <h2 class="card-title">📝 Recent Activity</h2>
+      <p style="color: #666;">
+        <a href="my-borrows.html" style="color: #667eea; text-decoration: none;">
+          View all borrow history →
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Check authentication
+    redirectIfNotAuth();
+
+    // Display user name
+    const userName = localStorage.getItem('userName');
+    if (userName) {
+      document.getElementById('userName').textContent = `Welcome, ${userName}`;
+    }
+
+    // Load dashboard data
+    async function loadDashboard() {
+      try {
+        // Load active borrows
+        const borrowsResponse = await api.getActiveBorrows();
+        const dashboardResponse = await api.getDashboardSummary();
+
+        // Update stats
+        if (borrowsResponse.success) {
+          const activeBorrows = borrowsResponse.data.activeBorrows || [];
+          document.getElementById('activeBorrowsCount').textContent = activeBorrows.length;
+
+          // Display active borrows
+          if (activeBorrows.length > 0) {
+            let html = '<div class="grid grid-2">';
+            activeBorrows.forEach(borrow => {
+              const dueDate = new Date(borrow.dueDate).toLocaleDateString();
+              html += `
+                <div class="book-card">
+                  <div class="book-card-title">${borrow.bookTitle || 'Unknown Book'}</div>
+                  <div class="book-card-author">by ${borrow.bookAuthor || 'Unknown Author'}</div>
+                  <div class="book-card-price">Due: ${dueDate}</div>
+                  <div class="book-card-price">₹${borrow.totalCost}</div>
+                  <button class="btn btn-success btn-small" onclick="returnBook(${borrow.id})">
+                    Return Book
+                  </button>
+                </div>
+              `;
+            });
+            html += '</div>';
+            document.getElementById('activeBorrowsContainer').innerHTML = html;
+          } else {
+            document.getElementById('activeBorrowsContainer').innerHTML = 
+              '<p style="color: #666; text-align: center; padding: 30px;">No active borrows. <a href="books.html" style="color: #667eea;">Browse books</a></p>';
+          }
+        }
+
+        // Update dashboard summary
+        if (dashboardResponse.success) {
+          const summary = dashboardResponse.data;
+          document.getElementById('pendingPaymentAmount').textContent = `₹${summary.pendingPayments?.amount || 0}`;
+          document.getElementById('totalBorrowsCount').textContent = summary.totalBooksBorrowed || 0;
+        }
+      } catch (error) {
+        showMessage('Error loading dashboard: ' + error.message, 'error');
+      }
+    }
+
+    // Return book function
+    async function returnBook(borrowId) {
+      if (!confirm('Are you sure you want to return this book?')) {
+        return;
+      }
+
+      try {
+        const response = await api.submitReturn(borrowId);
+        if (response.success) {
+          showMessage('Book returned successfully!', 'success');
+          loadDashboard();
+        } else {
+          showMessage(response.message || 'Failed to return book', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Load data on page load
+    loadDashboard();
+    setInterval(loadDashboard, 30000); // Refresh every 30 seconds
+  </script>
+</body>
+</html>

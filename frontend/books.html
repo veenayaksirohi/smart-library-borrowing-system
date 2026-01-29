@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Books - Smart Library</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">📚 Smart Library</a>
+    <div class="navbar-menu">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="books.html">Browse Books</a>
+      <a href="my-borrows.html">My Borrows</a>
+      <a href="payments.html">Payments</a>
+      <span id="userName"></span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div id="message" class="message"></div>
+
+    <h1 style="margin-bottom: 30px; color: white;">📚 Browse Books</h1>
+
+    <!-- Search Bar -->
+    <div class="search-bar" style="background: white; padding: 20px; border-radius: 8px;">
+      <input 
+        type="text" 
+        id="searchInput" 
+        placeholder="Search books by title or author..." 
+        onkeyup="handleSearch()"
+      >
+      <button class="btn btn-primary" onclick="resetSearch()">Clear</button>
+    </div>
+
+    <!-- Books Grid -->
+    <div id="booksContainer" class="grid grid-3" style="margin-top: 30px;">
+      <div class="loading" style="grid-column: 1/-1;">
+        <span class="spinner"></span> Loading books...
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="paginationContainer" class="pagination" style="margin-top: 30px;"></div>
+  </div>
+
+  <!-- Borrow Modal -->
+  <div id="borrowModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalBookTitle">Borrow Book</h2>
+        <button class="close-btn" onclick="closeBorrowModal()">×</button>
+      </div>
+      
+      <div id="borrowModalBody">
+        <div class="form-group">
+          <label for="daysToKeep">Days to Keep (1-14):</label>
+          <input 
+            type="number" 
+            id="daysToKeep" 
+            min="1" 
+            max="14" 
+            value="7"
+            onchange="calculateCost()"
+          >
+        </div>
+
+        <div id="costCalculation" style="display: none; margin-bottom: 20px;">
+          <div class="card" style="background: #f8f9fa; padding: 15px; margin: 0;">
+            <p><strong>Daily Rate:</strong> <span id="dailyRate">₹-</span></p>
+            <p><strong>Number of Days:</strong> <span id="numberOfDays">-</span></p>
+            <p style="font-size: 18px;"><strong>Total Cost:</strong> <span id="totalCost" style="color: #667eea;">₹-</span></p>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block" onclick="calculateCost()">
+          Calculate Cost
+        </button>
+        <button class="btn btn-success btn-block" id="borrowBtn" style="display: none;" onclick="confirmBorrow()">
+          Borrow Now
+        </button>
+        <button class="btn btn-secondary btn-block" onclick="closeBorrowModal()">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Check authentication
+    redirectIfNotAuth();
+
+    // Display user name
+    const userName = localStorage.getItem('userName');
+    if (userName) {
+      document.getElementById('userName').textContent = `Welcome, ${userName}`;
+    }
+
+    // State
+    let currentPage = 1;
+    let currentSearch = '';
+    let selectedBookId = null;
+
+    // Load books
+    async function loadBooks(page = 1, search = '') {
+      try {
+        const response = await api.getBooks(page, 12, search);
+        
+        if (response.success) {
+          const books = response.data.books || [];
+          currentPage = page;
+          currentSearch = search;
+
+          if (books.length === 0) {
+            document.getElementById('booksContainer').innerHTML = 
+              '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">No books found. Try a different search.</p>';
+            document.getElementById('paginationContainer').innerHTML = '';
+            return;
+          }
+
+          // Display books
+          let html = '';
+          books.forEach(book => {
+            html += `
+              <div class="book-card">
+                <div class="book-card-title">${book.title}</div>
+                <div class="book-card-author">by ${book.author}</div>
+                <div class="book-card-price">₹${book.pricePerDay} per day</div>
+                <div class="book-card-description">${book.description || 'No description available'}</div>
+                <button class="btn btn-primary" onclick="openBorrowModal(${book.id}, '${book.title}', ${book.pricePerDay})">
+                  Borrow Book
+                </button>
+              </div>
+            `;
+          });
+          document.getElementById('booksContainer').innerHTML = html;
+
+          // Pagination
+          const totalPages = response.data.totalPages || 1;
+          let paginationHtml = '';
+          for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === page ? 'active' : '';
+            paginationHtml += `
+              <button class="${activeClass}" onclick="loadBooks(${i}, '${search}')">
+                ${i}
+              </button>
+            `;
+          }
+          document.getElementById('paginationContainer').innerHTML = paginationHtml;
+        } else {
+          showMessage(response.message || 'Failed to load books', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Search books
+    function handleSearch() {
+      const search = document.getElementById('searchInput').value;
+      loadBooks(1, search);
+    }
+
+    // Reset search
+    function resetSearch() {
+      document.getElementById('searchInput').value = '';
+      loadBooks(1, '');
+    }
+
+    // Open borrow modal
+    function openBorrowModal(bookId, bookTitle, pricePerDay) {
+      selectedBookId = bookId;
+      document.getElementById('modalBookTitle').textContent = `Borrow: ${bookTitle}`;
+      document.getElementById('daysToKeep').value = 7;
+      document.getElementById('costCalculation').style.display = 'none';
+      document.getElementById('borrowBtn').style.display = 'none';
+      document.getElementById('borrowModal').classList.add('show');
+    }
+
+    // Close borrow modal
+    function closeBorrowModal() {
+      document.getElementById('borrowModal').classList.remove('show');
+      selectedBookId = null;
+    }
+
+    // Calculate cost
+    async function calculateCost() {
+      if (!selectedBookId) return;
+
+      const days = parseInt(document.getElementById('daysToKeep').value);
+      
+      if (days < 1 || days > 14) {
+        showMessage('Days must be between 1 and 14', 'error');
+        return;
+      }
+
+      try {
+        const response = await api.calculateCost(selectedBookId, days);
+        
+        if (response.success) {
+          const cost = response.data;
+          document.getElementById('dailyRate').textContent = `₹${cost.dailyRate}`;
+          document.getElementById('numberOfDays').textContent = days;
+          document.getElementById('totalCost').textContent = `₹${cost.totalCost}`;
+          document.getElementById('costCalculation').style.display = 'block';
+          document.getElementById('borrowBtn').style.display = 'block';
+        } else {
+          showMessage(response.message || 'Failed to calculate cost', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Confirm borrow
+    async function confirmBorrow() {
+      if (!selectedBookId) return;
+
+      const days = parseInt(document.getElementById('daysToKeep').value);
+
+      try {
+        const response = await api.borrowBook(selectedBookId, days);
+        
+        if (response.success) {
+          showMessage('Book borrowed successfully!', 'success');
+          closeBorrowModal();
+          setTimeout(() => {
+            window.location.href = 'my-borrows.html';
+          }, 1500);
+        } else {
+          showMessage(response.message || 'Failed to borrow book', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Load books on page load
+    loadBooks();
+  </script>
+</body>
+</html>

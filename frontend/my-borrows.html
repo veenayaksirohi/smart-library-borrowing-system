@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Borrows - Smart Library</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <a href="dashboard.html" class="navbar-brand">📚 Smart Library</a>
+    <div class="navbar-menu">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="books.html">Browse Books</a>
+      <a href="my-borrows.html">My Borrows</a>
+      <a href="payments.html">Payments</a>
+      <span id="userName"></span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div id="message" class="message"></div>
+
+    <h1 style="margin-bottom: 30px; color: white;">📖 My Borrow History</h1>
+
+    <!-- Borrow History Table -->
+    <div class="card">
+      <h2 class="card-title">Borrow Records</h2>
+      <div id="borrowsContainer" class="loading">
+        <span class="spinner"></span> Loading...
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="paginationContainer" class="pagination"></div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Check authentication
+    redirectIfNotAuth();
+
+    // Display user name
+    const userName = localStorage.getItem('userName');
+    if (userName) {
+      document.getElementById('userName').textContent = `Welcome, ${userName}`;
+    }
+
+    // Load borrow history
+    async function loadBorrows(page = 1) {
+      try {
+        const response = await api.getBorrowHistory(page, 10);
+        
+        if (response.success) {
+          const borrows = response.data.borrows || [];
+
+          if (borrows.length === 0) {
+            document.getElementById('borrowsContainer').innerHTML = 
+              '<p style="text-align: center; padding: 30px; color: #666;">No borrow history. <a href="books.html" style="color: #667eea;">Browse books</a></p>';
+            document.getElementById('paginationContainer').innerHTML = '';
+            return;
+          }
+
+          // Create table
+          let html = `
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Book Title</th>
+                  <th>Borrow Date</th>
+                  <th>Due Date</th>
+                  <th>Return Date</th>
+                  <th>Cost</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+          `;
+
+          borrows.forEach(borrow => {
+            const borrowDate = new Date(borrow.borrowDate).toLocaleDateString();
+            const dueDate = new Date(borrow.dueDate).toLocaleDateString();
+            const returnDate = borrow.returnDate 
+              ? new Date(borrow.returnDate).toLocaleDateString() 
+              : '-';
+            const statusClass = borrow.status === 'ACTIVE' ? 'info' : 'success';
+
+            html += `
+              <tr>
+                <td>${borrow.bookTitle || 'Book'}</td>
+                <td>${borrowDate}</td>
+                <td>${dueDate}</td>
+                <td>${returnDate}</td>
+                <td>₹${borrow.totalCost}</td>
+                <td><span class="message ${statusClass}" style="display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 12px;">${borrow.status}</span></td>
+                <td>
+                  ${borrow.status === 'ACTIVE' 
+                    ? `<button class="btn btn-danger btn-small" onclick="returnBook(${borrow.id})">Return</button>` 
+                    : '-'}
+                </td>
+              </tr>
+            `;
+          });
+
+          html += `
+              </tbody>
+            </table>
+          `;
+          document.getElementById('borrowsContainer').innerHTML = html;
+
+          // Pagination
+          const totalPages = response.data.totalPages || 1;
+          let paginationHtml = '';
+          for (let i = 1; i <= totalPages; i++) {
+            const activeClass = i === page ? 'active' : '';
+            paginationHtml += `
+              <button class="${activeClass}" onclick="loadBorrows(${i})">
+                ${i}
+              </button>
+            `;
+          }
+          document.getElementById('paginationContainer').innerHTML = paginationHtml;
+        } else {
+          showMessage(response.message || 'Failed to load borrow history', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Return book function
+    async function returnBook(borrowId) {
+      if (!confirm('Are you sure you want to return this book?')) {
+        return;
+      }
+
+      try {
+        const response = await api.submitReturn(borrowId);
+        if (response.success) {
+          showMessage('Book returned successfully!', 'success');
+          loadBorrows(1);
+        } else {
+          showMessage(response.message || 'Failed to return book', 'error');
+        }
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Load on page load
+    loadBorrows();
+  </script>
+</body>
+</html>
